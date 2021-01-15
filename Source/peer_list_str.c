@@ -22,7 +22,6 @@ void mka_pls_freeze(peer_list_str *peer_l, int type) {
             usleep(time2);
         peer_l->pl_is_busy = rand1;
     } else {
-        int p = 0;
         while(peer_l->pl_is_busy > 0) usleep(time2);
         --peer_l->pl_is_busy;
         if(++peer_l->pl_is_busy > 0)
@@ -109,15 +108,15 @@ void mka_pls_peer_dlt_by_id(peer_list_str *peer_l, int id) {
     if (peer_l->capacity > id && id >= 0) {
         if (peer_l->peer_l[id].status == 1) --peer_l->num_live_peers;
         --peer_l->capacity;
-        if (peer_l->capacity >= id) {
+        if(peer_l->capacity == 0) {
+            free(peer_l->peer_l);
+            peer_l->peer_l = (peer_list_unit *)calloc(0,sizeof(peer_list_unit));
+        } else if (peer_l->capacity >= id) {
             if(peer_l->capacity > id){
                 memcpy(&peer_l->peer_l[id], &peer_l->peer_l[id + 1], sizeof(peer_list_unit) * (peer_l->capacity - id));
                 for (int i = id; i < peer_l->capacity; ++i) peer_l->peer_l[i].id = i;
             }
             peer_l->peer_l = (peer_list_unit *) realloc(peer_l->peer_l, sizeof(peer_list_unit) * (peer_l->capacity));
-        } else if(peer_l->capacity == 0) {
-            free(peer_l->peer_l);
-            peer_l->peer_l = (peer_list_unit *)calloc(0,sizeof(peer_list_unit));
         }
         peer_l->pl_is_changed = 1;
     }
@@ -226,11 +225,12 @@ void *mka_pls_cleaner_thread_func(void *args){
 
 int mka_pls_upd_peer_list_by_peers_id_pr_t(char *peers_id_pr_t, int len, peer_list_str *peer_l, int my_id) {
     if(peers_id_pr_t == NULL || len == 0){
+        printf("zero upd srt\n");
         return 0;
     }
+//    print_string(peers_id_pr_t, len);
     int number_of_peers = len / (int)(sizeof(peer_l->peer_l->id) + sizeof(peer_l->peer_l->p.KS_priority) + sizeof(peer_l->peer_l->time));
     char *pointer = peers_id_pr_t;
-//    printf("---- number of recv peers: %d\n", number_of_peers);
     int id;
     int priority;
     unsigned short time_p;
@@ -245,27 +245,18 @@ int mka_pls_upd_peer_list_by_peers_id_pr_t(char *peers_id_pr_t, int len, peer_li
         pointer += sizeof(priority);
         memcpy(&time_p, pointer, sizeof(time_p));
         pointer += sizeof(time_p);
-
-//        sscanf(pointer, "%d", &id);
-//        pointer += sizeof(peer_l->peer_l->id);
-//        sscanf(pointer, "%c", &priority);
-//        pointer += sizeof(peer_l->peer_l->p.KS_priority);
-//        sscanf(pointer, "%hu", &time_p);
-//        pointer += sizeof(peer_l->peer_l->time) + 1;
-
+//        printf("id = %d\n", id);
         id_in_pl = mka_pls_peer_get_id_by_peer_id_wthout_access_control(peer_l, id);
-//        printf("------- Peer check --------\n");
-//        print_peer(mka_pls_peer_init(&p, id, priority));
-//        printf("Time: %d\n", time_p);
+//        printf("id_in_pl = %d\n", id_in_pl);
         peer_l->pl_is_changed = 0;
         if(id_in_pl == -1){
             if(time(NULL) % 3600 - time_p < peer_l->timeout && id != my_id){
                 // добавляем peer + там флаг, что надо всем отправить, кроме того же интерфейса (надо будет добавить)
                 mka_pls_peer_add_with_time_and_status(peer_l, mka_pls_peer_init(&p, id, priority), time_p, 1);
-//                printf("------- Peer add --------\n");
             }
         } else {
-//            printf("------- Peer upd --------\n");
+//            printf("time_p = %d\n", time_p);
+//            printf("peer_l[id_in_pl].time = %d\n", peer_l->peer_l[id_in_pl].time);
             // todo: посмотреть насчет пересечения границы в 0 сек
             if(time(NULL) % 3600 - time_p < peer_l->timeout && peer_l->peer_l[id_in_pl].time < time_p){
                 // меняем время на большее
@@ -302,11 +293,9 @@ char *mka_pls_get_live_peers_with_peer_id(peer_list_str *peer_l, int *len){
 }
 
 void mka_pls_destruct(peer_list_str *peer_l){
-    for(int i = 0; i < peer_l->capacity; ++i)
-        free(&peer_l->peer_l[i]);
+    free(peer_l->peer_l);
 }
 
-// todo: возможно стоит обновлять CAK, а не только peer_id of interface
 /* ----------------------------------------------------------------------------------------------- */
 /*! Обновление номера узла интерфейса, у которого умер этот узел
 
@@ -315,14 +304,27 @@ void mka_pls_destruct(peer_list_str *peer_l){
     @return                                                                      */
 /* ----------------------------------------------------------------------------------------------- */
 int upd_peer_id_of_died_peers(mka_common_args *c){
-    mka_cpl_freeze(&c->connectionParamsList, 0);
-    unsigned char dest_mac = {0xff,0xff,0xff,0xff,0xff,0xff};
-    for (int i = 0; i < c->connectionParamsList.num_of_c_p; ++i){
-        if(mka_pls_peer_get_id_by_peer_id(&c->mka_i.peer_l, c->connectionParamsList.c_p_list[i].peer_id) == -1){
-            c->connectionParamsList.c_p_list[i].peer_id = -1;
-            c->connectionParamsList.c_p_list[i].pause_HT = 0;
-            memcpy(c->connectionParamsList.c_p_list[i].dest_mac, &dest_mac, 6);
+    connection_params *c_p;
+    int num;
+    for(int i = 0; i < c->connectionParamsList.num_of_c_p; ++i){
+        c_p = &c->connectionParamsList.c_p_list[i];
+        for (int j = 0; j < c_p->pcl_capacity; ++j){
+            int num = mka_pls_peer_get_id_by_peer_id(&c->mka_i.peer_l,c_p->potential_connection_list[j].peer_id);
+            if(num == -1){
+                mka_cp_freeze(c_p, 0, 0);
+                mka_key_str_rm_peer_keys_by_peer_id(&c->mka_i.mkaKeyStr, c_p->potential_connection_list[j].peer_id);
+                mka_cp_rm_connection_by_peer_id(c_p, c_p->potential_connection_list[j].peer_id, 0);
+                mka_cp_unfreeze(c_p, 0, 0);
+            }
+        }
+        for (int j = 0; j < c_p->acl_capacity; ++j) {
+            int num = mka_pls_peer_get_id_by_peer_id(&c->mka_i.peer_l,c_p->alive_connection_list[j].peer_id);
+            if(num == -1){
+                mka_cp_freeze(c_p, 0, 1);
+                mka_key_str_rm_peer_keys_by_peer_id(&c->mka_i.mkaKeyStr, c_p->alive_connection_list[j].peer_id);
+                mka_cp_rm_connection_by_peer_id(c_p, c_p->alive_connection_list[j].peer_id, 1);
+                mka_cp_unfreeze(c_p, 0, 1);
+            }
         }
     }
-    mka_cpl_unfreeze(&c->connectionParamsList, 0);
 }

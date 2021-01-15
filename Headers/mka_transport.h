@@ -14,7 +14,6 @@
 // todo: may be if we could not decrypt then send to next peer?
 typedef struct mka_tr_open_msg{
     int id_src;     /// Номер узла отправителя
-    int id_rcv;     /// Номер узла получателя
     int encr;       /// Флаг, свидетельствующий о том, что сообщение зашифровано
     int type;       /// Тип соощения: 0 - helloTime; 1 - ks_msg; 2 - finish (not implemented)
 } mka_tr_open_msg;
@@ -23,6 +22,7 @@ typedef struct mka_tr_open_msg{
 /*! Структура зашифрованных заголовков */
 /* ----------------------------------------------------------------------------------------------- */
 typedef struct mka_tr_encr_msg{
+    int id_rcv;                 /// Номер узла получателя
     int num_of_fragments;       /// Количесво фрагментов
     int fragment_id;            /// Номер фрагмента
     int KS_priority;            /// Приоритет КС узла отправителя
@@ -32,6 +32,7 @@ typedef struct mka_tr_encr_msg{
 /*! Отправляет данные любой (не шифрует) длины с заголовками выше
 
     @param connectionParams - структура с данными о конкретном соединении
+    @param id_recv          - идентификатор абонента получателя
     @param mka_i            - структура с основной информацией
     @param data             - строка для отправки
     @param data_len         - длина data
@@ -39,19 +40,24 @@ typedef struct mka_tr_encr_msg{
 
 */
 /* ----------------------------------------------------------------------------------------------- */
-void mka_tr_send_data(connection_params *connectionParams, mka_info *mka_i, char *data, int data_len, int msg_type);
+void mka_tr_send_data(connection_params *connectionParams, int id_recv, mka_info *mka_i, char *data, int data_len,
+                      int msg_type);
 
 /* ----------------------------------------------------------------------------------------------- */
 /*! Отправляет данные любой (шифрует) длины с заголовками выше
 
     @param connectionParams     - структура с данными о конкретном соединении
+    @param id_recv              - идентификатор абонента получателя
     @param mka_i                - структура с основной информацией
     @param data                 - строка для отправки
     @param data_len             - длина data
     @param msg_type             - тип сообщения
+
+    @return 0 - успех, 1 - ошибка
 */
 /* ----------------------------------------------------------------------------------------------- */
-void mka_tr_send_encr_data(connection_params *connectionParams, mka_info *mka_i, ak_uint8 *data, int data_len, int msg_type);
+int mka_tr_send_encr_data(connection_params *connectionParams, int id_recv, mka_info *mka_i, ak_uint8 *data, int data_len,
+                      int msg_type);
 
 /* ----------------------------------------------------------------------------------------------- */
 /*! Получение данных mka (не дефрагментированных, без заголовков)

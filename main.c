@@ -1,28 +1,35 @@
 #include "signal.h"
 #include "Headers/mka_interface.h"
 
-int *global;
+int global = 0;
 void sig_g(){
-    ++(*global);
+    ++(global);
 }
-
-static ak_uint8 keyAnnexA[32] = {
-        0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01, 0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe,
-        0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, 0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88 };
 
 int main() {
     char line[512], c[1];
     size_t len;
     int number_of_interfaces = 0, peer_id;
     mka_common_args commonArgs;
+
+    // signal
+    struct sigaction sig;
+    sig.sa_handler = sig_g;
+    sigemptyset(&sig.sa_mask);
+    sigprocmask(0,0,&sig.sa_mask);
+    sig.sa_flags = 0;
+    sigaction(SIGINT,&sig,0);
+
     printf("Enter peer id\n");
     scanf("%d", &peer_id);
-    printf("Enter PSK\n");
-    scanf("%s", line);
-    if(mka_common_args_init(&commonArgs, peer_id, 1, 10, keyAnnexA, 32)) {
+    FILE *fp = fopen("../bkey.txt", "r"); // ключ Блома
+    if(mka_common_args_init(&commonArgs, peer_id, 1, 10, fp)) {
         mka_common_args_destruct(&commonArgs);
+        fclose(fp);
         return 1;
     }
+    fclose(fp);
+
 
     printf("Enter number of interfaces\n");
     scanf("%d", &number_of_interfaces);
@@ -35,10 +42,11 @@ int main() {
             return 1;
         }
     }
-    
+
     if(start_mka_connection(&commonArgs) == 0)
-        sleep(1000);
+        while(global == 0) sleep(1);
     stop_mka_connection(&commonArgs);
+    printf("exit\n");
 
     return 0;
 }

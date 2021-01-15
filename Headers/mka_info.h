@@ -24,11 +24,12 @@ typedef struct mka_info{
     @param id           - номер текущего узла
     @param KS_priority  - приоритет КС
     @param list_timeout - время жизни узлов
+    @param fp           - дескриптор файла с ключем Блома
 
     @return 0 - успех, 1 - ошибка
 */
 /* ----------------------------------------------------------------------------------------------- */
-int mka_info_init(mka_info *mka_i, int id, int KS_priority, int list_timeout);
+int mka_info_init(mka_info *mka_i, int id, int KS_priority, int list_timeout, FILE *fp);
 
 /* ----------------------------------------------------------------------------------------------- */
 /*! Очистка структуры

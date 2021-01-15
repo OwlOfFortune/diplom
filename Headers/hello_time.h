@@ -32,10 +32,9 @@ void *mka_htmsg_send_thread_func(void *args);
 /*! Ф-ия отправки приветственных сообщений всем узлам. Если это первые сообщения, то отправляются
  *  пустые, незашифрованные сообщения с potential_peer = -1
 
-    @param commonArgs   - структура с общими параметрами
-    @param encr         - 0 - не шифруются, 1 - зашифровываются
-    @param остальные параметры передаются для заполнения заголовка
-
+    @param commonArgs           - структура с общими параметрами
+    @param encr                 - 0 - не шифруются, 1 - зашифровываются
+    @param                      - остальные данные для заголовков
 */
 /* ----------------------------------------------------------------------------------------------- */
 void mka_htmsg_send_data_to_all(mka_common_args *commonArgs, int encr, int potential_peer, int random_live_peer_str,
@@ -44,16 +43,16 @@ void mka_htmsg_send_data_to_all(mka_common_args *commonArgs, int encr, int poten
 /* ----------------------------------------------------------------------------------------------- */
 /*! Ф-ия отправки приветственного сообщения одному узлу
 
-    @param commonArgs       - структура с общими параметрами
-    @param interface_num    - номер интерфейса для отправки
-    @param encr             - 0 - не шифруются, 1 - зашифровываются
-    @param остальные параметры передаются для заполнения заголовка
+    @param commonArgs           - структура с общими параметрами
+    @param interface_num        - номер интерфейса для отправки
+    @param encr                 - 0 - не шифруются, 1 - зашифровываются
+    @param                      - остальные данные для заголовков
 
     @return 0 - успех, 1 - ошибка
 */
 /* ----------------------------------------------------------------------------------------------- */
-int mka_htmsg_send(mka_common_args *commonArgs, int interface_num, int encr, int potential_peer,
-                   int random_live_peer_str, char *live_peer_str, int live_peer_str_len,
-                   char *potential_peer_list, int ppl_len, char *other, int other_len);
+int mka_htmsg_send(mka_common_args *commonArgs, int interface_num, int id_recv, int encr, int potential_peer,
+                   int random_live_peer_str, char *live_peer_str, int live_peer_str_len, char *potential_peer_list,
+                   int ppl_len, char *other, int other_len);
 
 #endif //DIPLOMA_HELLO_TIME_H

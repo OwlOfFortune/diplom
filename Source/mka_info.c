@@ -1,13 +1,13 @@
 #include "../Headers/mka_info.h"
 
-int mka_info_init(mka_info *mka_i, int id, int KS_priority, int list_timeout){
+int mka_info_init(mka_info *mka_i, int id, int KS_priority, int list_timeout, FILE *fp){
     mka_i->my_KS_priority = KS_priority;
     mka_i->KS_priority = KS_priority;
     mka_i->id = id;
     mka_pls_init(&mka_i->peer_l, list_timeout);
     mka_i->isKS = 1;
     mka_i->msg_num = 1;
-    if(mka_key_str_init(&mka_i->mkaKeyStr)) return 1;
+    if(mka_key_str_init(&mka_i->mkaKeyStr, fp)) return 1;
     return 0;
 }
 

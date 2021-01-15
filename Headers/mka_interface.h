@@ -8,7 +8,7 @@
 /* ----------------------------------------------------------------------------------------------- */
 /*! Создание потоков
 
-    @param mka_common_args - структура с общими параметрами
+    @param commonArgs - структура с общими параметрами
 
     @return 0 - успех, 1 - ошибка
 */
@@ -32,7 +32,7 @@ int stop_mka_connection(mka_common_args *commonArgs);
     @param interface        - название интерфейса
     @param interface_len    - длина интерфейса
 
-    @return  0 - успех, 1 - ошибка
+    @return 0 - успех, 1 - ошибка
 */
 /* ----------------------------------------------------------------------------------------------- */
 int mka_add_interface(mka_common_args *commonArgs, char *interface, int interface_len);
@@ -41,7 +41,6 @@ int mka_add_interface(mka_common_args *commonArgs, char *interface, int interfac
 /*! Ф-ия, передаваемая в поток для получения mka соощений
 
     @param args - mka_common_args - структура с общими параметрами
-
 */
 /* ----------------------------------------------------------------------------------------------- */
 void *recv_mka_msg(void *args);
@@ -51,7 +50,7 @@ void *recv_mka_msg(void *args);
  * потока по дескриптору
 
     @param connectionParamsList - указатель на структуру с данными о параметрах соединения
-    @param t - дескриптор потока
+    @param t                    - дескриптор потока
 
     @return  Порядковый номер соединения
 */

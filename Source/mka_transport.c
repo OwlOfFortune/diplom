@@ -5,7 +5,8 @@
 static ak_uint8 iv128[16] = {
         0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11 };
 
-void mka_tr_send_data(connection_params *connectionParams, mka_info *mka_i, char *data, int data_len, int msg_type){
+void mka_tr_send_data(connection_params *connectionParams, int id_recv, mka_info *mka_i, char *data, int data_len,
+                      int msg_type) {
     int num_of_chars = (MTU_SIZE - sizeof(mka_tr_encr_msg) - sizeof(mka_tr_open_msg) - sizeof(struct ether_header) - 1);
     int num_of_parts = (int)ceil(data_len / num_of_chars);
     if(num_of_parts == 0) num_of_parts = 1;
@@ -18,9 +19,9 @@ void mka_tr_send_data(connection_params *connectionParams, mka_info *mka_i, char
 
     mka_t_o->id_src = mka_i->id;
 //    printf("Id sent %d\n", mka_i->id);
-    mka_t_o->id_rcv = connectionParams->peer_id;
+    mka_t->id_rcv = id_recv;
     mka_t_o->encr = 0;
-    mka_t->KS_priority = mka_i->my_KS_priority;
+    mka_t->KS_priority = 0;
     mka_t->num_of_fragments = num_of_parts;
     mka_t_o->type = msg_type;
 
@@ -32,7 +33,7 @@ void mka_tr_send_data(connection_params *connectionParams, mka_info *mka_i, char
         pointer += num_of_chars;
 //        print_mka_frame_without_ether(sendbuf, sendbuf_len);
         sendbuf[sendbuf_len - 1] = '\0';
-        mka_cp_send_data(connectionParams, sendbuf, sendbuf_len);
+        mka_cp_send_data(connectionParams, sendbuf, sendbuf_len, id_recv);
         memset(sendbuf + sizeof(mka_tr_encr_msg) + sizeof(mka_tr_open_msg), 0, num_of_chars);
     }
     mka_t->fragment_id = num_of_parts - 1;
@@ -40,11 +41,12 @@ void mka_tr_send_data(connection_params *connectionParams, mka_info *mka_i, char
     sendbuf[sizeof(mka_tr_encr_msg) + sizeof(mka_tr_open_msg) + smallest_part] = '\0';
 //    print_mka_frame_without_ether(sendbuf, sizeof(mka_transport_encr_msg) + sizeof(mka_transport_open_msg) + smallest_part);
     mka_cp_send_data(connectionParams, sendbuf,
-                     sizeof(mka_tr_encr_msg) + sizeof(mka_tr_open_msg) + smallest_part);
+                     sizeof(mka_tr_encr_msg) + sizeof(mka_tr_open_msg) + smallest_part, id_recv);
     free(sendbuf);
 }
 
-void mka_tr_send_encr_data(connection_params *connectionParams, mka_info *mka_i, ak_uint8 *data, int data_len, int msg_type){
+int mka_tr_send_encr_data(connection_params *connectionParams, int id_recv, mka_info *mka_i, ak_uint8 *data, int data_len,
+                          int msg_type) {
     int num_of_chars = (MTU_SIZE - sizeof(mka_tr_encr_msg) - sizeof(mka_tr_open_msg) - sizeof(struct ether_header) - 16 - 1); // для нулевого символа
     int num_of_parts = (int)ceil(data_len / num_of_chars);
     if(data_len < num_of_chars) num_of_parts = 1;
@@ -55,12 +57,20 @@ void mka_tr_send_encr_data(connection_params *connectionParams, mka_info *mka_i,
     struct ether_header *eh = (struct ether_header *)sendbuf;
     mka_tr_open_msg *mka_t_o = (struct mka_tr_open_msg *)(sendbuf + sizeof (struct ether_header));
     mka_tr_encr_msg *mka_t = (struct mka_tr_encr_msg *)(sendbuf + sizeof (struct ether_header) + sizeof(struct mka_tr_open_msg));
+    unsigned char *dest_found;
+    int num = mka_key_str_get_peer_key_num_by_peer_id(&mka_i->mkaKeyStr, id_recv);
+//    printf("NUM Keys: %d\n", num);
 
     memcpy(eh->ether_shost, connectionParams->src_mac, ETH_ALEN);
-    memcpy(eh->ether_dhost, connectionParams->dest_mac, ETH_ALEN);
+    if((dest_found = mka_cp_get_dest_mac_by_peer_id(connectionParams, id_recv)) == NULL) {
+        printf("Send error, no such peer\n");
+        if(sendbuf != NULL) free(sendbuf);
+        return 1;
+    }
+    memcpy(eh->ether_dhost, dest_found, ETH_ALEN);
     eh->ether_type = htons(MKA_PROTO);
     mka_t_o->id_src = mka_i->id;
-    mka_t_o->id_rcv = connectionParams->peer_id;
+    mka_t->id_rcv = id_recv;
     mka_t_o->encr = 1;
     mka_t->KS_priority = mka_i->my_KS_priority;
     mka_t->num_of_fragments = num_of_parts;
@@ -74,8 +84,8 @@ void mka_tr_send_encr_data(connection_params *connectionParams, mka_info *mka_i,
         pointer += num_of_chars;
         if(msg_type == 0)
             ak_bckey_encrypt_mgm(
-                &mka_i->mkaKeyStr.CAK[connectionParams->interface_num],              /* ключ, используемый для шифрования данных */
-                &mka_i->mkaKeyStr.CAK[connectionParams->interface_num],             /* ключ, используемый для имитозащиты данных */
+                &mka_i->mkaKeyStr.peer_keys_list[num].CAK,              /* ключ, используемый для шифрования данных */
+                &mka_i->mkaKeyStr.peer_keys_list[num].CAK,             /* ключ, используемый для имитозащиты данных */
                 sendbuf,                  /* указатель на ассоциированные данные */
                 sizeof(mka_tr_open_msg) + sizeof (struct ether_header),          /* длина ассоциированных данных */
                 sendbuf + sizeof( mka_tr_open_msg ) + sizeof (struct ether_header),                  /* указатель на зашифровываемые данные */
@@ -90,10 +100,9 @@ void mka_tr_send_encr_data(connection_params *connectionParams, mka_info *mka_i,
                 16                                      /* размер имитовставки */
             );
         else if(msg_type == 1) {
-            mka_key_str_gen_KEK(&mka_i->mkaKeyStr);
             ak_bckey_encrypt_mgm(
-                    &mka_i->mkaKeyStr.KEK,              /* ключ, используемый для шифрования данных */
-                    &mka_i->mkaKeyStr.KEK,             /* ключ, используемый для имитозащиты данных */
+                    &mka_i->mkaKeyStr.peer_keys_list[num].KEK,              /* ключ, используемый для шифрования данных */
+                    &mka_i->mkaKeyStr.peer_keys_list[num].KEK,             /* ключ, используемый для имитозащиты данных */
                     sendbuf,                  /* указатель на ассоциированные данные */
                     sizeof(mka_tr_open_msg) + sizeof (struct ether_header),          /* длина ассоциированных данных */
                     sendbuf + sizeof( mka_tr_open_msg ) + sizeof (struct ether_header),                  /* указатель на зашифровываемые данные */
@@ -109,7 +118,7 @@ void mka_tr_send_encr_data(connection_params *connectionParams, mka_info *mka_i,
             );
         }
         sendbuf[sendbuf_len - 1] = '\0';
-        mka_cp_send_data(connectionParams, sendbuf + sizeof(struct ether_header), sendbuf_len);
+        mka_cp_send_data(connectionParams, sendbuf + sizeof(struct ether_header), sendbuf_len, id_recv);
         memset(sendbuf + sizeof(mka_tr_encr_msg) + sizeof(mka_tr_open_msg) + sizeof (struct ether_header), 0, num_of_chars + 16);
     }
     mka_t->fragment_id = num_of_parts - 1;
@@ -117,8 +126,8 @@ void mka_tr_send_encr_data(connection_params *connectionParams, mka_info *mka_i,
 //    print_mka_frame(sendbuf, sizeof(mka_transport_encr_msg) + sizeof (struct ether_header) + sizeof(mka_transport_open_msg) + smallest_part);
     if(msg_type == 0)
         ak_bckey_encrypt_mgm(
-                &mka_i->mkaKeyStr.CAK[connectionParams->interface_num],              /* ключ, используемый для шифрования данных */
-                &mka_i->mkaKeyStr.CAK[connectionParams->interface_num],             /* ключ, используемый для имитозащиты данных */
+                &mka_i->mkaKeyStr.peer_keys_list[num].CAK,              /* ключ, используемый для шифрования данных */
+                &mka_i->mkaKeyStr.peer_keys_list[num].CAK,             /* ключ, используемый для имитозащиты данных */
                 sendbuf,                  /* указатель на ассоциированные данные */
                 sizeof(mka_tr_open_msg) + sizeof (struct ether_header),          /* длина ассоциированных данных */
                 sendbuf + sizeof( mka_tr_open_msg ) + sizeof (struct ether_header),                  /* указатель на зашифровываемые данные */
@@ -133,10 +142,9 @@ void mka_tr_send_encr_data(connection_params *connectionParams, mka_info *mka_i,
                 16                                      /* размер имитовставки */
         );
     else if(msg_type == 1) {
-        mka_key_str_gen_KEK(&mka_i->mkaKeyStr);
         ak_bckey_encrypt_mgm(
-                &mka_i->mkaKeyStr.KEK,              /* ключ, используемый для шифрования данных */
-                &mka_i->mkaKeyStr.KEK,             /* ключ, используемый для имитозащиты данных */
+                &mka_i->mkaKeyStr.peer_keys_list[num].KEK,              /* ключ, используемый для шифрования данных */
+                &mka_i->mkaKeyStr.peer_keys_list[num].KEK,             /* ключ, используемый для имитозащиты данных */
                 sendbuf,                  /* указатель на ассоциированные данные */
                 sizeof(mka_tr_open_msg) + sizeof (struct ether_header),          /* длина ассоциированных данных */
                 sendbuf + sizeof( mka_tr_open_msg ) + sizeof (struct ether_header),                  /* указатель на зашифровываемые данные */
@@ -153,8 +161,9 @@ void mka_tr_send_encr_data(connection_params *connectionParams, mka_info *mka_i,
     }
     sendbuf[sizeof(struct ether_header) + sizeof(mka_tr_encr_msg) + sizeof(mka_tr_open_msg) + smallest_part + 16] = '\0';
     mka_cp_send_data(connectionParams, sendbuf + sizeof(struct ether_header),
-                     sizeof(mka_tr_encr_msg) + sizeof(mka_tr_open_msg) + smallest_part + 16);
-    if(sendbuf == NULL) free(sendbuf);
+                     sizeof(mka_tr_encr_msg) + sizeof(mka_tr_open_msg) + smallest_part + 16, id_recv);
+    if(sendbuf != NULL) free(sendbuf);
+    return 0;
 }
 
 char *mka_tr_recv_data(connection_params *connectionParams, struct ether_header *eh, mka_tr_encr_msg *mka_t, mka_tr_open_msg *mka_t_o, int *data_len){
@@ -189,6 +198,8 @@ char *mka_tr_recv_defragment_data(connection_params *connectionParams, mka_info 
     char *defragment_data = (char *)calloc(1, sizeof(char));
     *data_len = 0;
     int len, result, icv_len = 0, recv_data_len = 0, frag_num = 1, frag_id = 0;
+    int num, id;
+
     while (frag_id < frag_num) {
         buffer = mka_cp_recieve_data_sec(connectionParams, &len, 3);
         if(buffer == NULL) {
@@ -198,13 +209,27 @@ char *mka_tr_recv_defragment_data(connection_params *connectionParams, mka_info 
         }
         memcpy(eh, buffer, sizeof(struct ether_header));
         memcpy(mka_t_o, buffer + sizeof(struct ether_header), sizeof(struct mka_tr_open_msg));
-
-        printf("Recv %d interface from %d peer\n", connectionParams->interface_num, mka_t_o->id_src);
-        if (mka_t_o->encr == 1 && mka_i->mkaKeyStr.cak_capacity > connectionParams->interface_num) {
+        num = mka_key_str_get_peer_key_num_by_peer_id(&mka_i->mkaKeyStr, mka_t_o->id_src);
+        if(frag_id == 0 && mka_t_o->id_src != 0 && num == -1){
+            printf("Peer id to add: %d\n", mka_t_o->id_src);
+            peer p_recv;
+            mka_pls_peer_init(&p_recv, mka_t_o->id_src, 0);
+            mka_pls_peer_add(&mka_i->peer_l, &p_recv);
+            mka_cp_add_potential_connection(connectionParams, mka_t_o->id_src,
+                                            eh->ether_shost);
+            mka_key_str_add_peer_keys(&mka_i->mkaKeyStr);
+            mka_key_str_set_peer_id(&mka_i->mkaKeyStr, mka_t_o->id_src, mka_i->mkaKeyStr.peer_keys_list_capacity - 1);
+            mka_key_str_gen_CAK(&mka_i->mkaKeyStr, mka_t_o->id_src);
+            mka_key_str_gen_KEK(&mka_i->mkaKeyStr, mka_t_o->id_src);
+            num = mka_i->mkaKeyStr.peer_keys_list_capacity - 1;
+        }
+//        printf("NUM Keys: %d\n", num);
+//        printf("Recv %d interface from %d peer\n", connectionParams->interface_num, mka_t_o->id_src);
+        if (mka_t_o->encr == 1 && num != -1) {
             if (mka_t_o->type == 0) {
                 result = ak_bckey_decrypt_mgm(
-                        &mka_i->mkaKeyStr.CAK[connectionParams->interface_num],              /* ключ, используемый для шифрования данных */
-                        &mka_i->mkaKeyStr.CAK[connectionParams->interface_num],             /* ключ, используемый для имитозащиты данных */
+                        &mka_i->mkaKeyStr.peer_keys_list[num].CAK,              /* ключ, используемый для шифрования данных */
+                        &mka_i->mkaKeyStr.peer_keys_list[num].CAK,             /* ключ, используемый для имитозащиты данных */
                         buffer,                  /* указатель на ассоциированные данные */
                         sizeof(mka_tr_open_msg) +
                         sizeof(struct ether_header),          /* длина ассоциированных данных */
@@ -222,10 +247,9 @@ char *mka_tr_recv_defragment_data(connection_params *connectionParams, mka_info 
                         16                                      /* размер имитовставки */
                 );
             } else {
-                mka_key_str_gen_KEK(&mka_i->mkaKeyStr);
                 result = ak_bckey_decrypt_mgm(
-                        &mka_i->mkaKeyStr.KEK,              /* ключ, используемый для шифрования данных */
-                        &mka_i->mkaKeyStr.KEK,             /* ключ, используемый для имитозащиты данных */
+                        &mka_i->mkaKeyStr.peer_keys_list[num].KEK,              /* ключ, используемый для шифрования данных */
+                        &mka_i->mkaKeyStr.peer_keys_list[num].KEK,             /* ключ, используемый для имитозащиты данных */
                         buffer,                  /* указатель на ассоциированные данные */
                         sizeof(mka_tr_open_msg) +
                         sizeof(struct ether_header),          /* длина ассоциированных данных */
@@ -244,11 +268,12 @@ char *mka_tr_recv_defragment_data(connection_params *connectionParams, mka_info 
             }
             icv_len = 16;
             if(result != ak_error_ok){
+                printf("Decrypt error\n");
                 free(buffer);
                 free(defragment_data);
                 return NULL;
             }
-        } else if(mka_i->mkaKeyStr.cak_capacity <= connectionParams->interface_num){
+        } else if(num == -1 && mka_t_o->encr == 1){
             free(buffer);
             free(defragment_data);
             return NULL;
@@ -262,7 +287,7 @@ char *mka_tr_recv_defragment_data(connection_params *connectionParams, mka_info 
             free(defragment_data);
             return NULL;
         }
-        mka_tr_print_frame(buffer, len);
+//        mka_tr_print_frame(buffer, len);
         defragment_data = (char *) realloc(defragment_data, sizeof(char) * (*data_len + recv_data_len));
         memcpy(defragment_data + *data_len, buffer + sizeof(struct ether_header) + sizeof(struct mka_tr_encr_msg) +
                                             sizeof(struct mka_tr_open_msg), recv_data_len);

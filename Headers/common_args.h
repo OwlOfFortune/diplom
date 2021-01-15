@@ -14,7 +14,10 @@ typedef struct mka_common_args {
     int hello_time_timeout;                              /// Интервал в сек для отправки приветственных сообщений
     int need_to_send_HTM;                                /// Флаг, свидетельствующий о необходимости послать helloTimeMsg внепланово
     int need_to_refresh_SAK;                             /// Флаг, свидетельствующий о необходимости пересчитать SAK
-    pthread_t need_to_send_SAK_to_others__received_t;    /// Дескриптор потока, с которого узел получил SAK
+    int need_to_send_SAK_to_others__received_t;          /// Номер интерфейса потока, с которого узел получил SAK
+    int need_to_send_SAK_to_others__peer_id;             /// Номер узла потока, с которого узел получил SAK
+    int reply_SAK__received_t;                           /// Номер интерфейса потока, который хочет заново получить SAK
+    int reply_SAK__peer_id;                              /// Номер интерфейса потока, который хочет заново получить SAK
     int stop;                                            /// Флаг для остановки потоков
     pthread_t tid_cleaner, tid_send, tid_ks_server;      /// Дескрипторы потоков (очистка массива узлов, отправки helloTimeMsg, КС)
 } mka_common_args;
@@ -26,13 +29,12 @@ typedef struct mka_common_args {
     @param id           - номер текущего узла
     @param KS_priority  - приоритет КС текущего узла
     @param list_timeout - время жизни узлов
-    @param psk          - предварительно распределенный ключ
-    @param psk_len      - длина PSK
+    @param fp           - дескриптор файла с ключем Блома
 
     @return 0 - успех, 1 - ошибка
 */
 /* ----------------------------------------------------------------------------------------------- */
-int mka_common_args_init(mka_common_args *commonArgs, int id, char KS_priority, int list_timeout, unsigned char *psk, int psk_len);
+int mka_common_args_init(mka_common_args *commonArgs, int id, char KS_priority, int list_timeout, FILE *fp);
 
 /* ----------------------------------------------------------------------------------------------- */
 /*! Очистка структуры
