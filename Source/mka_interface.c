@@ -53,7 +53,7 @@ struct sended_live_peers_char{
 struct sended_live_peers_char *sended_live_peers_char_rm_by_id(struct sended_live_peers_char *sendedLivePeersCharArrays, int *slpca_capacity, int i){
     // удаление проверочной строки
     if (*slpca_capacity > i) {
-        free(sendedLivePeersCharArrays[i].sended_buffer);
+        free(sendedLivePeersCharArrays[i].sended_buffer); // error
         --*slpca_capacity;
         if (*slpca_capacity >= i) {
             if(*slpca_capacity > i){
@@ -75,6 +75,8 @@ void *recv_mka_msg(void *args){
     struct ether_header eh;
     char *recv_buffer = NULL, *buffer = NULL;
     int buffer_len, recv_buffer_len = 0;
+    time_t start_period = time(NULL);
+    int period_length_sec = 2, pause_listening_sec = 15, max_num_new_connections_period = 30, num_new_connections_period = 0;
     mka_tr_encr_msg mka_t;
     mka_tr_open_msg mka_t_o;
     peer p_recv;
@@ -88,7 +90,20 @@ void *recv_mka_msg(void *args){
         while((buffer == NULL || mka_t_o.id_src == 0) && commonArgs->stop == 0)
             buffer = mka_tr_recv_defragment_data(&commonArgs->connectionParamsList.c_p_list[interface_num],
                                                  &commonArgs->mka_i, &eh, &mka_t, &mka_t_o, &buffer_len);
+        if(num_new_connections_period > max_num_new_connections_period){
+            time_t start = time(NULL);
+            printf("Sorry for blocking interface for %d sec\n", pause_listening_sec);
+            while(time(NULL) - start < pause_listening_sec)
+                continue;
+            start_period = time(NULL);
+            num_new_connections_period = 0;
+            continue;
+        }
         if(commonArgs->stop == 1) break;
+        if(time(NULL) - start_period > period_length_sec) {
+            start_period = time(NULL);
+            num_new_connections_period = 0;
+        }
 
         if(mka_t_o.type == 1) {
             printf("Received KS\n");
@@ -137,12 +152,19 @@ void *recv_mka_msg(void *args){
 //        printf("id = %d\n", id);
 //        printf("status = %d\n", commonArgs->mka_i.peer_l.peer_l[id].status);
         // процедура неизвестный -> потенциальный
-        int i;
-        for(i = 0; i< slpca_capacity; ++i)
-            if(mka_t_o.id_src == sendedLivePeersCharArrays[i].id) break;
+        int i = slpca_capacity;
+        for(int j = 0; j < slpca_capacity; ++j){
+            int id2 = mka_pls_peer_get_id_by_peer_id(&commonArgs->mka_i.peer_l, sendedLivePeersCharArrays[j].id);
+            if(id2 == -1) {
+                sendedLivePeersCharArrays = sended_live_peers_char_rm_by_id(sendedLivePeersCharArrays, &slpca_capacity, j);
+                --j;
+            }
+            if(j!= -1 && mka_t_o.id_src == sendedLivePeersCharArrays[j].id) i = j;
+        }
         if(helloTimeMsg.potential_peer == -1 && i == slpca_capacity && num_incorrect_answers != 9 && commonArgs->mka_i.peer_l.peer_l[id].status == 0) {
             // отправляем для аутентификации абонента
             printf("Sended rnd str, potential_p = -1\n");
+            ++num_new_connections_period;
             buffer = mka_pls_get_live_peers_with_peer_id_pr_t(&commonArgs->mka_i.peer_l, &buffer_len);
             int rand = 0;
             if (buffer_len == 0) {

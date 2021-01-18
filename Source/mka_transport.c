@@ -211,7 +211,7 @@ char *mka_tr_recv_defragment_data(connection_params *connectionParams, mka_info 
         memcpy(mka_t_o, buffer + sizeof(struct ether_header), sizeof(struct mka_tr_open_msg));
         num = mka_key_str_get_peer_key_num_by_peer_id(&mka_i->mkaKeyStr, mka_t_o->id_src);
         if(frag_id == 0 && mka_t_o->id_src != 0 && num == -1){
-            printf("Peer id to add: %d\n", mka_t_o->id_src);
+//            printf("Peer id to add: %d\n", mka_t_o->id_src);
             peer p_recv;
             mka_pls_peer_init(&p_recv, mka_t_o->id_src, 0);
             mka_pls_peer_add(&mka_i->peer_l, &p_recv);

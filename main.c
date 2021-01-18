@@ -2,7 +2,7 @@
 #include "Headers/mka_interface.h"
 
 int global = 0;
-void sig_g(){
+void sig_g1(){
     ++(global);
 }
 
@@ -14,7 +14,7 @@ int main() {
 
     // signal
     struct sigaction sig;
-    sig.sa_handler = sig_g;
+    sig.sa_handler = sig_g1;
     sigemptyset(&sig.sa_mask);
     sigprocmask(0,0,&sig.sa_mask);
     sig.sa_flags = 0;

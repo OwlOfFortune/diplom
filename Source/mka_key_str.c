@@ -144,7 +144,7 @@ void mka_key_str_rm_peer_keys_by_peer_id(mka_key_str *mka_key_str, int peer_id){
         --mka_key_str->peer_keys_list_capacity;
         if(mka_key_str->peer_keys_list_capacity == 0) {
             ak_bckey_destroy( &mka_key_str->peer_keys_list[0].CAK);
-            ak_bckey_destroy( &mka_key_str->peer_keys_list[num].KEK);
+            ak_bckey_destroy( &mka_key_str->peer_keys_list[0].KEK);
             free(mka_key_str->peer_keys_list);
             mka_key_str->peer_keys_list = (peer_keys *)calloc(0, sizeof(peer_keys));
         } else if (mka_key_str->peer_keys_list_capacity >= num) {

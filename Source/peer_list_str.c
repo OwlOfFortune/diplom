@@ -53,7 +53,7 @@ void mka_pls_peer_add(peer_list_str *peer_l, peer *p){
     peer_l->peer_l[peer_l->capacity].time = time(NULL) % 3600;
     ++peer_l->capacity;
     peer_l->pl_is_changed = 1;
-    printf("Peer %d was added\n", p->peer_id);
+//    printf("Peer %d was added\n", p->peer_id);
 }
 // нельзя использовать вне других ф-ий с контролем доступа к peer_l
 void mka_pls_peer_add_with_time_and_status(peer_list_str *peer_l, peer *p, unsigned short time, int status) {
@@ -65,7 +65,7 @@ void mka_pls_peer_add_with_time_and_status(peer_list_str *peer_l, peer *p, unsig
     peer_l->peer_l[peer_l->capacity].time = time;
     ++peer_l->capacity;
     peer_l->pl_is_changed = 1;
-    printf("Peer %d was added\n", p->peer_id);
+//    printf("Peer %d was added\n", p->peer_id);
 }
 
 void mka_pls_peer_upd_status_by_id(peer_list_str *peer_l, int id, char status){
@@ -126,7 +126,7 @@ void mka_pls_dlt_died_peers(peer_list_str *peer_l){
     mka_pls_freeze(peer_l, 0);
     for (int i = 0; i < peer_l->capacity; ++i) {
         if(time(NULL) % 3600 - peer_l->peer_l[i].time > peer_l->timeout) {
-            printf("Peer %d was deleted\n", peer_l->peer_l[i].p.peer_id);
+            if(peer_l->peer_l[i].status == 1) printf("Peer %d was deleted\n", peer_l->peer_l[i].p.peer_id);
             mka_pls_peer_dlt_by_id(peer_l, i);
         }
     }

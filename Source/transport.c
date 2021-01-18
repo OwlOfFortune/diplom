@@ -221,6 +221,11 @@ int mka_cp_rm_connection_by_peer_id(connection_params *connectionParams, int pee
             }
             list = (connection *) realloc(list, sizeof(connection) * (*capacity));
         }
+        if(list_type == 0){
+            connectionParams->potential_connection_list = list;
+        } else if(list_type == 1){
+            connectionParams->alive_connection_list = list;
+        }
     }
     return 0;
 }
